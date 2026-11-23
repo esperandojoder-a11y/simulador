@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Caída Libre · LabTeal</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7fafc;
+  --surface: #ffffff;
+  --teal: #0d9488;
+  --teal-dark: #0f766e;
+  --teal-light: #ccfbf1;
+  --orange: #f97316;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 4px 24px rgba(15, 118, 110, 0.08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Outfit', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+header {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: white;
+  padding: 28px 20px 24px;
+  text-align: center;
+}
+header h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+header p {
+  margin: 6px 0 0;
+  opacity: 0.9;
+  font-size: 1rem;
+}
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+}
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; }
+}
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.panel h2 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+  color: var(--teal-dark);
+  font-weight: 600;
+}
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+input[type=range] {
+  width: 100%;
+  accent-color: var(--teal);
+}
+.val {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.05rem;
+  color: var(--orange);
+  margin-top: 4px;
+  font-weight: 500;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.toggle-row input { accent-color: var(--teal); width: 18px; height: 18px; }
+.btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+button {
+  flex: 1;
+  min-width: 90px;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 10px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-main {
+  background: var(--teal);
+  color: white;
+}
+.btn-main:hover { background: var(--teal-dark); }
+.btn-sec {
+  background: #f1f5f9;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-sec:hover { background: #e2e8f0; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.status-bar {
+  margin: 14px 0;
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: var(--muted);
+}
+.status-bar.run { background: var(--teal-light); color: var(--teal-dark); }
+.status-bar.pause { background: #ffedd5; color: #c2410c; }
+.status-bar.impact { background: #fee2e2; color: #991b1b; }
+
+/* Tower */
+.tower-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.tower {
+  position: relative;
+  width: 130px;
+  height: 440px;
+  background: linear-gradient(to bottom, #f0fdfa, #ccfbf1);
+  border: 3px solid var(--teal);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.falling {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 42px;
+  height: 42px;
+  background: radial-gradient(circle at 30% 30%, #fff, var(--orange));
+  border-radius: 50%;
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+  top: 12px;
+  transition: top 0.04s linear;
+  z-index: 2;
+}
+.floor {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: #0f766e;
+}
+.marks {
+  position: absolute;
+  right: 6px;
+  top: 10px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--teal-dark);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Telemetry */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.metric {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.metric .lbl {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.metric .num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.25rem;
+  color: var(--teal-dark);
+  margin-top: 2px;
+  font-weight: 600;
+}
+.metric .unit {
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+/* Charts section */
+.charts-section {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .charts-section { grid-template-columns: 1fr; }
+}
+.chart-wrap {
+  height: 270px;
+  position: relative;
+}
+
+/* Table */
+.table-wrap {
+  margin-top: 16px;
+  max-height: 240px;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-family: 'IBM Plex Mono', monospace;
+}
+th, td {
+  padding: 7px 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  background: #f0fdfa;
+  color: var(--teal-dark);
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+}
+tr:hover { background: #f8fafc; }
+
+.report {
+  margin-top: 16px;
+  padding: 14px;
+  background: #f0fdfa;
+  border-radius: 12px;
+  border: 1px solid #99f6e4;
+  display: none;
+}
+.report.show { display: block; }
+.report h3 { margin: 0 0 8px; color: var(--teal-dark); }
+
+.theory {
+  margin-top: 24px;
+  padding: 18px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+.theory p { color: var(--muted); line-height: 1.5; }
+.formula {
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--teal-dark);
+  margin: 6px 0;
+  font-size: 0.88rem;
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>LabTeal · Simulador de Caída Libre</h1>
+  <p>Datos, gráficas y tabla en tiempo real</p>
+</header>
+
+<div class="container">
+  <div class="layout">
+    <!-- Controles -->
+    <div class="panel">
+      <h2>Controles</h2>
+
+      <label>Altura inicial</label>
+      <input type="range" id="height" min="15" max="350" value="80" step="5">
+      <div class="val" id="heightVal">80 m</div>
+
+      <label style="margin-top:14px;">Masa</label>
+      <input type="range" id="mass" min="0.5" max="120" value="12" step="0.5">
+      <div class="val" id="massVal">12.0 kg</div>
+
+      <div class="toggle-row">
+        <input type="checkbox" id="air">
+        <label style="margin:0;">Resistencia del aire</label>
+      </div>
+
+      <div class="status-bar" id="status">Listo</div>
+
+      <div class="btns">
+        <button class="btn-main" id="startBtn">Soltar</button>
+        <button class="btn-sec" id="pauseBtn" disabled>Pausa</button>
+        <button class="btn-sec" id="resetBtn">Reiniciar</button>
+      </div>
+    </div>
+
+    <!-- Visual + métricas -->
+    <div>
+      <div class="panel">
+        <h2>Visualización</h2>
+        <div class="tower-container">
+          <div class="tower">
+            <div class="marks" id="marks"></div>
+            <div class="falling" id="ball"></div>
+            <div class="floor"></div>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="lbl">Velocidad</div>
+            <div class="num" id="vel">0.0</div>
+            <div class="unit">m/s</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Altura</div>
+            <div class="num" id="hNow">80.0</div>
+            <div class="unit">m</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Tiempo</div>
+            <div class="num" id="time">0.00</div>
+            <div class="unit">s</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Ep</div>
+            <div class="num" id="ep">0</div>
+            <div class="unit">J</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Ec</div>
+            <div class="num" id="ec">0</div>
+            <div class="unit">J</div>
+          </div>
+          <div class="metric">
+            <div class="lbl">Potencia</div>
+            <div class="num" id="power">0</div>
+            <div class="unit">W</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráficas -->
+  <div class="charts-section">
+    <div class="panel">
+      <h2>Energía potencial y cinética</h2>
+      <div class="chart-wrap"><canvas id="energyChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>Energía mecánica y potencia</h2>
+      <div class="chart-wrap"><canvas id="mechPowerChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="panel" style="margin-top:20px;">
+    <h2>Tabla de datos en tiempo real</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>t (s)</th>
+            <th>y (m)</th>
+            <th>v (m/s)</th>
+            <th>Ep (J)</th>
+            <th>Ec (J)</th>
+            <th>Em (J)</th>
+            <th>P (W)</th>
+          </tr>
+        </thead>
+        <tbody id="dataTable">
+          <tr><td colspan="8" style="color:#94a3b8; padding:16px;">Inicia la simulación para ver los datos</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel report" id="report">
+    <h3>Reporte del experimento</h3>
+    <div id="reportContent"></div>
+  </div>
+
+  <div class="theory">
+    <h2 style="margin-top:0;">Notas físicas</h2>
+    <p>En caída libre ideal la aceleración es constante (g ≈ 9.81 m/s²) e independiente de la masa.</p>
+    <div class="formula">v = g·t  y = h₀ − ½g·t²  Ep = m·g·y  Ec = ½m·v²</div>
+    <p>La potencia instantánea debida a la gravedad es P = m·g·v (en el vacío). Con resistencia del aire la energía mecánica deja de ser constante.</p>
+  </div>
+</div>
+
+<script>
+const g = 9.81;
+let height = 80;
+let mass = 12;
+let useAir = false;
+let running = false;
+let paused = false;
+let t = 0;
+let y = 80;
+let v = 0;
+let animationId = null;
+let lastTime = null;
+let sampleCount = 0;
+const maxPoints = 180;
+
+const heightSlider = document.getElementById('height');
+const massSlider = document.getElementById('mass');
+const airToggle = document.getElementById('air');
+const statusEl = document.getElementById('status');
+const ball = document.getElementById('ball');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const reportEl = document.getElementById('report');
+const dataTable = document.getElementById('dataTable');
+
+const commonOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 300 },
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { labels: { color: '#1e293b', usePointStyle: true } },
+    tooltip: { backgroundColor: '#fff', titleColor: '#1e293b', bodyColor: '#334155', borderColor: '#e2e8f0', borderWidth: 1 }
+  },
+  scales: {
+    x: { ticks: { color: '#64748b', maxTicksLimit: 8 }, grid: { color: 'rgba(0,0,0,0.04)' } },
+    y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+  }
+};
+
+const energyChart = new Chart(document.getElementById('energyChart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Ep (J)', data: [], borderColor: '#0d9488', backgroundColor: 'rgba(13,148,136,0.1)', borderWidth: 2.5, tension: 0.3, pointRadius: 0, fill: true },
+      { label: 'Ec (J)', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', borderWidth: 2.5, tension: 0.3, pointRadius: 0, fill: true }
+    ]
+  },
+  options: commonOpts
+});
+
+const mechPowerChart = new Chart(document.getElementById('mechPowerChart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: 'Em (J)', data: [], borderColor: '#7c3aed', borderWidth: 2.5, tension: 0.3, pointRadius: 0 },
+      { label: 'Potencia (W)', data: [], borderColor: '#db2777', borderWidth: 2.5, tension: 0.3, pointRadius: 0, yAxisID: 'y1' }
+    ]
+  },
+  options: {
+    ...commonOpts,
+    scales: {
+      ...commonOpts.scales,
+      y1: { position: 'right', ticks: { color: '#64748b' }, grid: { drawOnChartArea: false } }
+    }
+  }
+});
+
+function updateVals() {
+  document.getElementById('heightVal').textContent = height + ' m';
+  document.getElementById('massVal').textContent = mass.toFixed(1) + ' kg';
+}
+
+function updateMarks() {
+  const marks = document.getElementById('marks');
+  marks.innerHTML = '';
+  const steps = 5;
+  for (let i = 0; i <= steps; i++) {
+    const h = Math.round(height - (height / steps) * i);
+    const d = document.createElement('div');
+    d.textContent = h + ' m';
+    marks.appendChild(d);
+  }
+}
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = 'status-bar' + (cls ? ' ' + cls : '');
+}
+
+function updateBall() {
+  const usable = 408;
+  const ratio = Math.max(0, y / height);
+  const top = 12 + (1 - ratio) * (usable - 42);
+  ball.style.top = top + 'px';
+}
+
+function updateMetrics() {
+  const ep = mass * g * Math.max(0, y);
+  const ec = 0.5 * mass * v * v;
+  const power = mass * g * Math.abs(v); // potencia gravitatoria instantánea
+
+  document.getElementById('vel').textContent = Math.abs(v).toFixed(1);
+  document.getElementById('hNow').textContent = Math.max(0, y).toFixed(1);
+  document.getElementById('time').textContent = t.toFixed(2);
+  document.getElementById('ep').textContent = Math.round(ep);
+  document.getElementById('ec').textContent = Math.round(ec);
+  document.getElementById('power').textContent = Math.round(power);
+}
+
+function addRow() {
+  sampleCount++;
+  const ep = Math.round(mass * g * Math.max(0, y));
+  const ec = Math.round(0.5 * mass * v * v);
+  const em = ep + ec;
+  const power = Math.round(mass * g * Math.abs(v));
+
+  if (sampleCount === 1) dataTable.innerHTML = '';
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${sampleCount}</td>
+    <td>${t.toFixed(2)}</td>
+    <td>${Math.max(0, y).toFixed(1)}</td>
+    <td>${Math.abs(v).toFixed(1)}</td>
+    <td>${ep}</td>
+    <td>${ec}</td>
+    <td>${em}</td>
+    <td>${power}</td>
+  `;
+  dataTable.appendChild(tr);
+  dataTable.parentElement.scrollTop = dataTable.parentElement.scrollHeight;
+}
+
+function pushCharts() {
+  const ep = mass * g * Math.max(0, y);
+  const ec = 0.5 * mass * v * v;
+  const em = ep + ec;
+  const power = mass * g * Math.abs(v);
+
+  if (energyChart.data.labels.length >= maxPoints) {
+    energyChart.data.labels.shift();
+    energyChart.data.datasets.forEach(d => d.data.shift());
+    mechPowerChart.data.labels.shift();
+    mechPowerChart.data.datasets.forEach(d => d.data.shift());
+  }
+
+  const label = t.toFixed(2);
+  energyChart.data.labels.push(label);
+  energyChart.data.datasets[0].data.push(ep);
+  energyChart.data.datasets[1].data.push(ec);
+
+  mechPowerChart.data.labels.push(label);
+  mechPowerChart.data.datasets[0].data.push(em);
+  mechPowerChart.data.datasets[1].data.push(power);
+
+  energyChart.update('none');
+  mechPowerChart.update('none');
+}
+
+function clearAll() {
+  energyChart.data.labels = [];
+  energyChart.data.datasets.forEach(d => d.data = []);
+  mechPowerChart.data.labels = [];
+  mechPowerChart.data.datasets.forEach(d => d.data = []);
+  energyChart.update();
+  mechPowerChart.update();
+  sampleCount = 0;
+  dataTable.innerHTML = '<tr><td colspan="8" style="color:#94a3b8; padding:16px;">Inicia la simulación para ver los datos</td></tr>';
+}
+
+function step(dt) {
+  if (!useAir) {
+    v = g * t;
+    y = height - 0.5 * g * t * t;
+  } else {
+    const Cd = 0.47, area = 0.045, rho = 1.225;
+    const drag = 0.5 * rho * Cd * area * v * Math.abs(v);
+    const a = g - (drag / mass) * Math.sign(v || 1);
+    v += a * dt;
+    y -= v * dt;
+  }
+  if (y <= 0) {
+    y = 0;
+    v = Math.abs(v);
+    return true;
+  }
+  return false;
+}
+
+function loop(now) {
+  if (!running || paused) return;
+  if (!lastTime) lastTime = now;
+  const dt = Math.min(0.03, (now - lastTime) / 1000);
+  lastTime = now;
+  t += dt;
+
+  const hit = step(dt);
+  updateBall();
+  updateMetrics();
+
+  if (Math.floor(t * 4) >= sampleCount) addRow();
+  if (energyChart.data.labels.length === 0 || t - parseFloat(energyChart.data.labels.at(-1)) > 0.07) {
+    pushCharts();
+  }
+
+  if (hit) {
+    finish();
+    return;
+  }
+  animationId = requestAnimationFrame(loop);
+}
+
+function start() {
+  if (running && !paused) return;
+  height = +heightSlider.value;
+  mass = +massSlider.value;
+  useAir = airToggle.checked;
+
+  if (!running) {
+    t = 0;
+    y = height;
+    v = 0;
+    clearAll();
+    reportEl.classList.remove('show');
+  }
+
+  running = true;
+  paused = false;
+  lastTime = null;
+  setStatus(useAir ? 'Cayendo (con aire)' : 'Caída libre', 'run');
+  startBtn.disabled = true;
+  pauseBtn.disabled = false;
+  heightSlider.disabled = true;
+  massSlider.disabled = true;
+  airToggle.disabled = true;
+
+  animationId = requestAnimationFrame(loop);
+}
+
+function pause() {
+  if (!running) return;
+  paused = !paused;
+  if (paused) {
+    setStatus('Pausado', 'pause');
+    pauseBtn.textContent = 'Reanudar';
+  } else {
+    setStatus(useAir ? 'Cayendo (con aire)' : 'Caída libre', 'run');
+    pauseBtn.textContent = 'Pausa';
+    lastTime = null;
+    animationId = requestAnimationFrame(loop);
+  }
+}
+
+function finish() {
+  running = false;
+  cancelAnimationFrame(animationId);
+  setStatus('Impacto', 'impact');
+  startBtn.disabled = false;
+  pauseBtn.disabled = true;
+  heightSlider.disabled = false;
+  massSlider.disabled = false;
+  airToggle.disabled = false;
+
+  addRow();
+
+  const ep0 = mass * g * height;
+  const ecFinal = 0.5 * mass * v * v;
+  const eff = useAir ? Math.min(100, (ecFinal / ep0) * 100) : 100;
+
+  document.getElementById('reportContent').innerHTML = `
+    <p><strong>Altura:</strong> ${height.toFixed(1)} m</p>
+    <p><strong>Masa:</strong> ${mass.toFixed(1)} kg</p>
+    <p><strong>Tiempo:</strong> ${t.toFixed(2)} s</p>
+    <p><strong>Velocidad de impacto:</strong> ${Math.abs(v).toFixed(1)} m/s</p>
+    <p><strong>Energía inicial:</strong> ${Math.round(ep0)} J</p>
+    <p><strong>Ec final:</strong> ${Math.round(ecFinal)} J</p>
+    <p><strong>Eficiencia:</strong> ${eff.toFixed(1)} %</p>
+    <p><strong>Muestras:</strong> ${sampleCount}</p>
+  `;
+  reportEl.classList.add('show');
+}
+
+function reset() {
+  running = false;
+  paused = false;
+  cancelAnimationFrame(animationId);
+  t = 0;
+  y = +heightSlider.value;
+  v = 0;
+  height = y;
+  updateBall();
+  updateMetrics();
+  clearAll();
+  setStatus('Listo');
+  startBtn.disabled = false;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = 'Pausa';
+  heightSlider.disabled = false;
+  massSlider.disabled = false;
+  airToggle.disabled = false;
+  reportEl.classList.remove('show');
+}
+
+heightSlider.oninput = () => {
+  height = +heightSlider.value;
+  document.getElementById('heightVal').textContent = height + ' m';
+  if (!running) {
+    y = height;
+    updateBall();
+    updateMetrics();
+    updateMarks();
+  }
+};
+massSlider.oninput = () => {
+  mass = +massSlider.value;
+  document.getElementById('massVal').textContent = mass.toFixed(1) + ' kg';
+  if (!running) updateMetrics();
+};
+airToggle.onchange = () => { if (!running) useAir = airToggle.checked; };
+
+startBtn.onclick = start;
+pauseBtn.onclick = pause;
+resetBtn.onclick = reset;
+
+// Init
+updateVals();
+updateMarks();
+updateBall();
+updateMetrics();
+</script>
+</body>
+</html>
